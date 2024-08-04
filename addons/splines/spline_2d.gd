@@ -2,8 +2,13 @@
 extends Node2D
 class_name Spline2D
 
+signal shape_updated()
+
 ## Control Points
 @export var points:PackedVector2Array = PackedVector2Array()
+
+## Weights
+@export var weights:PackedFloat32Array = PackedFloat32Array()
 
 ## cached interpolated points
 var interpolated_points:PackedVector2Array
@@ -25,10 +30,11 @@ var interpolated_points:PackedVector2Array
     open = value
     update_shape()
 
-#@export var clamped:bool = false:
-  #set(value):
-    #clamped = value
-    #update_shape()
+@export var clamped:bool = true:
+  set(value):
+    clamped = value
+    update_shape()
+
 
 @export_group('Border')
 @export var border:bool = true:
@@ -61,11 +67,13 @@ var interpolated_points:PackedVector2Array
 
 func add_point(p:Vector2)->void:
   points.append(p)
+  weights.append(1.0)
   print_debug('add point %s (size=%d)' % [p, points.size()])
   update_shape()
 
 func insert_point(p:Vector2, idx:int)->void:
   points.insert(idx, p)
+  weights.insert(idx, 1.0)
   print_debug('insert point %s at %d (size=%d)' % [p, idx, points.size()])
   update_shape()
 
@@ -76,14 +84,21 @@ func set_point(idx:int, p:Vector2)->void:
 
 func remove_point(idx:int)->void:
   points.remove_at(idx)
+  weights.remove_at(idx)
   print_debug('removed point at %d (size=%d)' % [idx, points.size()])
   update_shape()
 
 func clear_points()->void:
   points.clear()
+  weights.clear()
   interpolated_points.clear()
   print_debug('clear points')
   queue_redraw()
+
+func reset_weights()->void:
+  weights.fill(1)
+  print_debug('reset weights')
+  update_shape()
 
 func set_pivot(p:Vector2)->void:
   for i in points.size():
@@ -121,13 +136,13 @@ func update_shape():
   var steps = detail * points.size()
   var c:float = steps - 1
   var c_points = points
+  var c_weights = weights
   if !open:
     c_points = c_points.duplicate()
     c_points.append_array(c_points.slice(0, degree + 1))
+    c_weights.append_array(c_weights.slice(0, degree + 1))
   var size = c_points.size()
-  var knots:PackedFloat32Array = create_uniform_knots(size, degree, open)
-  var weights:PackedFloat32Array = create_uniform_weights(size)
-
+  var knots:PackedFloat32Array = create_uniform_knots(size, degree, clamped && open)
   var pts:PackedVector2Array = PackedVector2Array()
   var maxT = 1.0
   if !open:
@@ -137,6 +152,7 @@ func update_shape():
   for n in steps:
     pts[n] = interpolate(maxT * n / c, degree, c_points, knots, weights)
   interpolated_points = pts
+  shape_updated.emit()
   queue_redraw()
 
 func _draw() -> void:
@@ -158,12 +174,6 @@ static func create_uniform_knots(size:int, degree:int, clamped:bool)->PackedFloa
     if !clamped || (i>degree-1 && i < m - degree - 1):
       v += 1
   return knots
-
-static func create_uniform_weights(size)->PackedFloat32Array:
-  var weights:PackedFloat32Array = PackedFloat32Array()
-  weights.resize(size)
-  weights.fill(1)
-  return weights
 
 static func interpolate(t:float, degree:int, points:PackedVector2Array, knots:PackedFloat32Array, weights:PackedFloat32Array)->Vector2:
   var n:int = points.size();

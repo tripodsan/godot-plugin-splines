@@ -16,6 +16,9 @@ var spline:Spline2D
 var selected_point_idx:int = -1
 var create_point_pos:Vector2
 var create_point_idx:int = -1
+var show_weights:bool = true
+
+const wh_length:float = 100.0
 
 func add_button(tool_tip:String, mode:MODE, icon:String)->Button:
   var btn:Button = Button.new()
@@ -137,18 +140,52 @@ func _forward_canvas_draw_over_viewport(overlay: Control) -> void:
   var smoothHandle:Texture2D = overlay.get_theme_icon("EditorPathSmoothHandle", "EditorIcons");
   var handle_size:Vector2 = smoothHandle.get_size()
   var xform:Transform2D = get_et() * spline.get_global_transform()
-  var pts = xform * spline.points
+  var pts:PackedVector2Array = xform * spline.points
   if !spline.open:
     pts.append(pts[0])
   overlay.draw_polyline(pts, Color.RED, 2)
   if !spline.open:
     pts.resize(pts.size() - 1)
+
+  if show_weights:
+    var wHandle:Texture2D = overlay.get_theme_icon("EditorCurveHandle", "EditorIcons");
+    var wHandle_size:Vector2 = wHandle.get_size()
+    if spline.open:
+      for i in pts.size():
+        var w = spline.weights[i]
+        var p = pts[i]
+        var n
+        if i == 0:
+          n = (pts[i + 1] - p).orthogonal().normalized()
+        elif i == pts.size() - 1:
+          n = (p - pts[i - 1]).orthogonal().normalized()
+        else:
+          var n0 = (pts[i + 1] - p).orthogonal().normalized()
+          var n1 = (p - pts[i - 1]).orthogonal().normalized()
+          n = ((n0 + n1) / 2.0).normalized()
+        var p1 = p + n * wh_length * w
+        overlay.draw_line(p, p1, Color.RED)
+        overlay.draw_texture_rect(wHandle, Rect2(p1 - wHandle_size * 0.5, wHandle_size), false)
+    else:
+      var l = pts.size()
+      for i in l:
+        var w = spline.weights[i]
+        var p = pts[i]
+        var n0 = (pts[(i + 1) % l] - p).orthogonal().normalized()
+        var n1 = (p - pts[(i + l - 1) % l]).orthogonal().normalized()
+        var n:Vector2 = ((n0 + n1) / 2.0).normalized()
+        var p1 = p + n * wh_length * w
+        overlay.draw_line(p, p1, Color.RED)
+        overlay.draw_texture_rect(wHandle, Rect2(p1 - wHandle_size * 0.5, wHandle_size), false)
+
   for pt:Vector2 in pts:
     overlay.draw_texture_rect(smoothHandle, Rect2(pt -handle_size * 0.5, handle_size), false)
   if create_point_idx >=0:
     var addHandle:Texture2D = overlay.get_theme_icon("EditorHandleAdd", "EditorIcons")
     var ah_size:Vector2 = addHandle.get_size()
     overlay.draw_texture_rect(addHandle, Rect2(xform * create_point_pos -ah_size * 0.5, ah_size), false)
+
+
 
 #--------------------------------------------------------------------------------------------------------------------------------
 
@@ -169,9 +206,18 @@ func _handles(object: Object) -> bool:
   return false
 
 func _edit(object: Object)->void:
-  spline = object as Spline2D
-  if spline.points.is_empty():
-    set_mode(MODE.CREATE)
+  if object:
+    spline = object as Spline2D
+    if spline.points.is_empty():
+      set_mode(MODE.CREATE)
+    spline.shape_updated.connect(_on_shape_updated)
+  elif spline:
+    spline.shape_updated.disconnect(_on_shape_updated)
+    spline = null
+
+
+func _on_shape_updated()->void:
+  update_overlays()
 
 func _make_visible(visible: bool)->void:
   if visible:
