@@ -1,7 +1,7 @@
 @tool
 extends EditorPlugin
 
-enum MODE { CREATE, EDIT, DELETE, CLEAR, PIVOT }
+enum MODE { CREATE, EDIT, DELETE, CLEAR, PIVOT, WEIGHTS, RESET }
 
 var ctl:Container;
 var btn_edit:Button
@@ -9,6 +9,8 @@ var btn_create:Button
 var btn_delete:Button
 var btn_clear:Button
 var btn_pivot:Button
+var btn_weights:Button
+var btn_rst_weights:Button
 
 var mode:MODE = MODE.EDIT
 
@@ -16,9 +18,12 @@ var spline:Spline2D
 var selected_point_idx:int = -1
 var create_point_pos:Vector2
 var create_point_idx:int = -1
-var show_weights:bool = true
-
+var show_weights:bool = false
+var selected_weight_idx:int = -1
 const wh_length:float = 100.0
+
+var cached_weights_pos:PackedVector2Array = PackedVector2Array()
+var cached_weights_norm:PackedVector2Array = PackedVector2Array()
 
 func add_button(tool_tip:String, mode:MODE, icon:String)->Button:
   var btn:Button = Button.new()
@@ -39,13 +44,24 @@ func create_container()->Container:
   btn_delete = add_button("Delete Point", MODE.DELETE, 'CurveDelete')
   btn_clear  = add_button("Clear Points", MODE.CLEAR, 'Clear')
   btn_clear.set_toggle_mode(false)
-  btn_pivot  = add_button("Set Pivot", MODE.PIVOT, 'EditPivot')
+  btn_pivot = add_button("Set Pivot", MODE.PIVOT, 'EditPivot')
+  btn_weights = add_button("Edit Weights", MODE.WEIGHTS, 'CurveCurve')
+  btn_rst_weights = add_button("Reset Weights", MODE.RESET, 'CurveConstant')
+  btn_rst_weights.set_toggle_mode(false)
   return ctl;
 
 func set_mode(value:MODE)->void:
   print('Set Mode ', value)
   if value == MODE.CLEAR:
     spline.clear_points()
+    update_overlays()
+    return
+  if value == MODE.WEIGHTS:
+    show_weights = btn_weights.button_pressed
+    update_overlays()
+    return
+  if value == MODE.RESET:
+    spline.reset_weights()
     update_overlays()
     return
   mode = value
@@ -81,6 +97,13 @@ func _forward_canvas_gui_input(event:InputEvent)->bool:
       handle_idx = i
       break
 
+  var weight_idx = -1
+  if show_weights:
+    for i in cached_weights_pos.size():
+      if cached_weights_pos[i].distance_to(me.position) <= grab_threshold:
+        weight_idx = i
+        break
+
   if mb && mb.button_index == MOUSE_BUTTON_RIGHT && handle_idx >=0 && mb.pressed:
     selected_point_idx = -1
     spline.remove_point(handle_idx)
@@ -101,6 +124,10 @@ func _forward_canvas_gui_input(event:InputEvent)->bool:
 
     if handle_idx < 0:
       selected_point_idx = -1
+      if weight_idx >= 0:
+        selected_weight_idx = weight_idx
+        return true
+      selected_weight_idx = -1
       return false
     if mode == MODE.EDIT:
       selected_point_idx = handle_idx
@@ -117,6 +144,18 @@ func _forward_canvas_gui_input(event:InputEvent)->bool:
       update_overlays()
     else:
       selected_point_idx = -1
+    return true
+
+  if mm && selected_weight_idx >=0:
+    if mm.button_mask == MOUSE_BUTTON_MASK_LEFT:
+      var p = t * spline.points[selected_weight_idx]
+      var d = mm.position - p
+      var dot = d.dot(cached_weights_norm[selected_weight_idx])
+      var w = dot / 100.0
+      spline.set_weight(selected_weight_idx, w)
+      update_overlays()
+    else:
+      selected_weight_idx = -1
     return true
 
   var create_idx = -1
@@ -150,6 +189,8 @@ func _forward_canvas_draw_over_viewport(overlay: Control) -> void:
   if show_weights:
     var wHandle:Texture2D = overlay.get_theme_icon("EditorCurveHandle", "EditorIcons");
     var wHandle_size:Vector2 = wHandle.get_size()
+    cached_weights_pos.resize(pts.size())
+    cached_weights_norm.resize(pts.size())
     if spline.open:
       for i in pts.size():
         var w = spline.weights[i]
@@ -166,6 +207,8 @@ func _forward_canvas_draw_over_viewport(overlay: Control) -> void:
         var p1 = p + n * wh_length * w
         overlay.draw_line(p, p1, Color.RED)
         overlay.draw_texture_rect(wHandle, Rect2(p1 - wHandle_size * 0.5, wHandle_size), false)
+        cached_weights_pos[i] = p1
+        cached_weights_norm[i] = n
     else:
       var l = pts.size()
       for i in l:
@@ -177,6 +220,8 @@ func _forward_canvas_draw_over_viewport(overlay: Control) -> void:
         var p1 = p + n * wh_length * w
         overlay.draw_line(p, p1, Color.RED)
         overlay.draw_texture_rect(wHandle, Rect2(p1 - wHandle_size * 0.5, wHandle_size), false)
+        cached_weights_pos[i] = p1
+        cached_weights_norm[i] = n
 
   for pt:Vector2 in pts:
     overlay.draw_texture_rect(smoothHandle, Rect2(pt -handle_size * 0.5, handle_size), false)

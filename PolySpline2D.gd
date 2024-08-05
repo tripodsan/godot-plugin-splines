@@ -40,7 +40,9 @@ func update_shape():
     points.append_array(points.slice(0, degree + 1))
   var size = points.size()
   var knots:PackedFloat32Array = Spline2D.create_uniform_knots(size, degree, clamped)
-  var weights:PackedFloat32Array = Spline2D.create_uniform_weights(size)
+  var weights:PackedFloat32Array = PackedFloat32Array()
+  weights.resize(size)
+  weights.fill(1)
   var pts:PackedVector2Array = PackedVector2Array()
 
   var maxT = 1.0

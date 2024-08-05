@@ -82,6 +82,11 @@ func set_point(idx:int, p:Vector2)->void:
   #print_debug('set point %s at %d' % [p, idx])
   update_shape()
 
+func set_weight(idx:int, w:float)->void:
+  weights[idx] = w
+  #print_debug('set weight %f at %d' % [w, idx])
+  update_shape()
+
 func remove_point(idx:int)->void:
   points.remove_at(idx)
   weights.remove_at(idx)
