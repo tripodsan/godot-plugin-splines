@@ -253,15 +253,15 @@ func _handles(object: Object) -> bool:
 func _edit(object: Object)->void:
   if object == spline:
     return
+  if spline:
+    spline.shape_updated.disconnect(_on_shape_updated)
+    spline = null
   if object:
     spline = object as Spline2D
     if spline.points.is_empty():
       set_mode(MODE.CREATE)
     spline.shape_updated.connect(_on_shape_updated)
-  elif spline:
-    spline.shape_updated.disconnect(_on_shape_updated)
-    spline = null
-
+  update_overlays()
 
 func _on_shape_updated()->void:
   update_overlays()
