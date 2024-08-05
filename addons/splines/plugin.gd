@@ -251,6 +251,8 @@ func _handles(object: Object) -> bool:
   return false
 
 func _edit(object: Object)->void:
+  if object == spline:
+    return
   if object:
     spline = object as Spline2D
     if spline.points.is_empty():

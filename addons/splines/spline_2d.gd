@@ -63,6 +63,20 @@ var interpolated_points:PackedVector2Array
     fill_color = value
     queue_redraw()
 
+@export_group('Extend')
+
+## The minimal bottom (y) value to extend an open shape
+@export_range(0, 1000, 1, 'suffix:px', 'or_greater', 'or_less') var min_bottom:int = 0:
+  set(value):
+    min_bottom = value
+    update_shape()
+
+## The minimal top (y) value to extend an open shape
+@export_range(0, 1000, 1, 'suffix:px', 'or_greater', 'or_less') var min_top:int = 0:
+  set(value):
+    min_top = value
+    update_shape()
+
 # -------------------------------------------------------------------------
 
 func add_point(p:Vector2)->void:
@@ -148,15 +162,33 @@ func update_shape():
     c_weights.append_array(c_weights.slice(0, degree + 1))
   var size = c_points.size()
   var knots:PackedFloat32Array = create_uniform_knots(size, degree, clamped && open)
-  var pts:PackedVector2Array = PackedVector2Array()
+  var pts:Array[Vector2] = []
   var maxT = 1.0
   if !open:
     maxT = 1.0 - 1.0 / (size - degree)
 
   pts.resize(steps)
+  var r_min:Vector2 = Vector2(INF, INF)
+  var r_max:Vector2 = Vector2(-INF, -INF)
   for n in steps:
-    pts[n] = interpolate(maxT * n / c, degree, c_points, knots, weights)
-  interpolated_points = pts
+    var p = interpolate(maxT * n / c, degree, c_points, knots, weights)
+    pts[n] = p
+    r_min.x = min(r_min.x, p.x)
+    r_min.y = min(r_min.y, p.y)
+    r_max.x = max(r_max.x, p.x)
+    r_max.y = max(r_max.y, p.y)
+
+  if open and min_bottom != 0 and r_max.y < min_bottom:
+    # add 2 points at the beginning and end to extend the polygon
+    pts.push_front(Vector2(pts[0].x, min_bottom))
+    pts.push_back(Vector2(pts[-1].x, min_bottom))
+  elif open and min_top != 0 and r_min.y > min_top:
+    pts.push_front(Vector2(pts[0].x, min_top))
+    pts.push_back(Vector2(pts[-1].x, min_top))
+
+
+  interpolated_points = PackedVector2Array(pts)
+
   shape_updated.emit()
   queue_redraw()
 
