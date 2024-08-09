@@ -11,6 +11,10 @@ var btn_clear:Button
 var btn_pivot:Button
 var btn_weights:Button
 var btn_rst_weights:Button
+var tb_options:MenuButton
+var tb_options_popup:PopupMenu
+
+enum OPTS_MENU { ID_CLEAR, ID_RESET, ID_CREATE_COLLISION }
 
 var mode:MODE = MODE.EDIT
 
@@ -42,12 +46,19 @@ func create_container()->Container:
   btn_edit.button_pressed = true
   btn_create = add_button("Add Point\nRight Click: Delete Point", MODE.CREATE, 'CurveCreate')
   btn_delete = add_button("Delete Point", MODE.DELETE, 'CurveDelete')
-  btn_clear  = add_button("Clear Points", MODE.CLEAR, 'Clear')
-  btn_clear.set_toggle_mode(false)
   btn_pivot = add_button("Set Pivot", MODE.PIVOT, 'EditPivot')
   btn_weights = add_button("Edit Weights", MODE.WEIGHTS, 'CurveCurve')
-  btn_rst_weights = add_button("Reset Weights", MODE.RESET, 'CurveConstant')
-  btn_rst_weights.set_toggle_mode(false)
+
+  tb_options = MenuButton.new()
+  tb_options.tooltip_text = 'Spline Options'
+  tb_options_popup = tb_options.get_popup()
+  tb_options.text = 'Options'
+  tb_options_popup.add_icon_item(EditorInterface.get_base_control().get_theme_icon('Clear', 'EditorIcons'), "Clear", OPTS_MENU.ID_CLEAR)
+  tb_options_popup.add_icon_item(EditorInterface.get_base_control().get_theme_icon('CurveConstant', 'EditorIcons'), "Reset weights", OPTS_MENU.ID_RESET)
+  tb_options_popup.add_icon_item(EditorInterface.get_base_control().get_theme_icon('CollisionPolygon2D', 'EditorIcons'), "Creat Collision Shape", OPTS_MENU.ID_CREATE_COLLISION)
+  tb_options_popup.hide_on_checkable_item_selection = false
+  tb_options_popup.connect("id_pressed", _on_options_item_selected)
+  ctl.add_child(tb_options)
   return ctl;
 
 func set_mode(value:MODE)->void:
@@ -70,6 +81,13 @@ func set_mode(value:MODE)->void:
   btn_edit.button_pressed = mode == MODE.EDIT
   btn_pivot.button_pressed = mode == MODE.PIVOT
 
+func _on_options_item_selected(id:int)->void:
+  if id == OPTS_MENU.ID_CLEAR:
+    set_mode(MODE.CLEAR)
+  elif id == OPTS_MENU.ID_RESET:
+    set_mode(MODE.RESET)
+  elif id == OPTS_MENU.ID_CREATE_COLLISION:
+    spline.create_collision_polygon()
 
 func _forward_canvas_gui_input(event:InputEvent)->bool:
   if not event is InputEventMouse:

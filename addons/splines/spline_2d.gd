@@ -4,14 +4,17 @@ class_name Spline2D
 
 signal shape_updated()
 
+## cached interpolated points
+var interpolated_points:PackedVector2Array
+
 ## Control Points
 @export var points:PackedVector2Array = PackedVector2Array()
 
 ## Weights
 @export var weights:PackedFloat32Array = PackedFloat32Array()
 
-## cached interpolated points
-var interpolated_points:PackedVector2Array
+## Auto updated collision polygon
+@export_node_path('CollisionPolygon2D') var collision_poly:NodePath
 
 ## Degree of B-Spline (eg 3 for cubic)
 @export_range(1, 5) var degree:int = 3:
@@ -63,6 +66,11 @@ var interpolated_points:PackedVector2Array
     fill_color = value
     queue_redraw()
 
+@export var fill_texture:Texture2D:
+  set(value):
+    fill_texture = value
+    queue_redraw()
+
 @export_group('Extend')
 
 ## The minimal bottom (y) value to extend an open shape
@@ -96,6 +104,10 @@ func set_point(idx:int, p:Vector2)->void:
   #print_debug('set point %s at %d' % [p, idx])
   update_shape()
 
+func set_points(pts:PackedVector2Array)->void:
+  points = pts
+  reset_weights()
+
 func set_weight(idx:int, w:float)->void:
   weights[idx] = w
   #print_debug('set weight %f at %d' % [w, idx])
@@ -111,12 +123,14 @@ func clear_points()->void:
   points.clear()
   weights.clear()
   interpolated_points.clear()
+  update_collision_polygon()
   print_debug('clear points')
   queue_redraw()
 
 func reset_weights()->void:
+  weights.resize(points.size())
   weights.fill(1)
-  print_debug('reset weights')
+  #print_debug('reset weights')
   update_shape()
 
 func set_pivot(p:Vector2)->void:
@@ -124,6 +138,29 @@ func set_pivot(p:Vector2)->void:
     points[i] -= p
   print_debug('set pivot')
   update_shape()
+
+func create_collision_polygon()->void:
+  if collision_poly:
+    printerr('Collision polygon already exists.')
+    return
+  # assume if no poly exists, then also no static body exists
+  var body:StaticBody2D = StaticBody2D.new()
+  body.name = "StaticBody2D"
+  var col_poly:CollisionPolygon2D = CollisionPolygon2D.new()
+  col_poly.name = "CollisionPolygon2D"
+  body.add_child(col_poly)
+  add_child(body)
+  body.set_owner(owner)
+  col_poly.set_owner(owner)
+  col_poly.polygon = interpolated_points
+  collision_poly = get_path_to(col_poly)
+
+func update_collision_polygon()->void:
+  if !collision_poly: return
+  var poly:CollisionPolygon2D = get_node(collision_poly)
+  if !poly: return
+  poly.polygon = interpolated_points
+
 
 func get_closest_point(p: Vector2)->Dictionary:
   if points.size() < 3:
@@ -186,8 +223,8 @@ func update_shape():
     pts.push_front(Vector2(pts[0].x, min_top))
     pts.push_back(Vector2(pts[-1].x, min_top))
 
-
   interpolated_points = PackedVector2Array(pts)
+  update_collision_polygon()
 
   shape_updated.emit()
   queue_redraw()
@@ -196,7 +233,15 @@ func _draw() -> void:
   if interpolated_points.is_empty():
     return
   if fill:
-    draw_colored_polygon(interpolated_points, fill_color)
+    if fill_texture:
+      var s = fill_texture.get_size()
+      var tx = Transform2D(0, Vector2(1.0 / s.x, 1.0 / s.y), 0, Vector2.ZERO)
+      var uvs:PackedVector2Array = tx * interpolated_points
+      draw_colored_polygon(interpolated_points, fill_color, uvs, fill_texture)
+      texture_repeat=CanvasItem.TEXTURE_REPEAT_ENABLED
+    else:
+      draw_colored_polygon(interpolated_points, fill_color)
+
   if border:
     draw_polyline(interpolated_points, border_color, border_width)
 
