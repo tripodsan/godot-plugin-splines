@@ -21,6 +21,10 @@ window/size/viewport_width=1920
 window/size/viewport_height=1080
 window/stretch/mode="viewport"
 
+[editor]
+
+movie_writer/movie_file="/Users/tripod/codez/games/splines/screen_recording.avi"
+
 [editor_plugins]
 
 enabled=PackedStringArray("res://addons/explore-editor-theme/plugin.cfg", "res://addons/splines/plugin.cfg")

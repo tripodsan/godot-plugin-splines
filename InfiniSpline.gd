@@ -22,7 +22,10 @@ var seed:float = 1234.5567
     offset = value
     recalc()
 
+var xxhash:XXHash
+
 func _ready()->void:
+  xxhash = XXHash.new(seed)
   recalc()
 
 func _process(delta:float)->void:
@@ -32,12 +35,6 @@ func _process(delta:float)->void:
   var idx:int = round(x / delta_x)
   if idx != offset:
     offset = idx
-
-func xxhash(x:int, y:int)->float:
-  var h:int = seed + x * 374761393 + y * 668265263 # all constants are prime
-  h = (h ^ (h >> 13)) * 1274126177;
-  h ^= (h >> 16);
-  return (h & 0x00ffffff) * (1.0 / 0x1000000);
 
 func recalc()->void:
   if !spline:
@@ -51,6 +48,6 @@ func recalc()->void:
   for i in n:
     var xi = i - (spline.degree - 1) / 2.0 - 1
     var x:float = (xi + offset) * delta_x
-    var y = xxhash(xi + offset, 0) * size.y
+    var y = xxhash.hash(xi + offset, 0) * size.y
     pts[i] = Vector2(x, y)
   spline.set_points(pts)

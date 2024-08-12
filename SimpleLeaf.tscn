@@ -1,0 +1,18 @@
+[gd_scene load_steps=3 format=3 uid="uid://cftmxh0w5fwff"]
+
+[ext_resource type="Script" path="res://Leaf.gd" id="1_q5faf"]
+[ext_resource type="Script" path="res://addons/splines/spline_2d.gd" id="2_u4xt5"]
+
+[node name="leaf" type="Node2D"]
+script = ExtResource("1_q5faf")
+pointy = 20.0
+
+[node name="spline" type="Node2D" parent="."]
+script = ExtResource("2_u4xt5")
+points = PackedVector2Array(5, 0, 50, 100, 50, 200, 0, 300, -50, 200, -50, 100, -5, 0)
+weights = PackedFloat32Array(1, 1, 1, 20, 1, 1, 1)
+detail = 10
+border_width = 5.9
+border_color = Color(0.553919, 0.547326, 0.157127, 1)
+fill = true
+fill_color = Color(0.352837, 0.509934, 0.185717, 1)

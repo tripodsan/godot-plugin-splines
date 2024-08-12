@@ -86,6 +86,8 @@ var interpolated_points:PackedVector2Array
     update_shape()
 
 # -------------------------------------------------------------------------
+func _ready() -> void:
+  update_shape()
 
 func add_point(p:Vector2)->void:
   points.append(p)
@@ -104,9 +106,13 @@ func set_point(idx:int, p:Vector2)->void:
   #print_debug('set point %s at %d' % [p, idx])
   update_shape()
 
-func set_points(pts:PackedVector2Array)->void:
+func set_points(pts:PackedVector2Array, w = null)->void:
   points = pts
-  reset_weights()
+  if w is PackedFloat32Array:
+    weights = w
+    update_shape()
+  else:
+    reset_weights()
 
 func set_weight(idx:int, w:float)->void:
   weights[idx] = w
@@ -186,7 +192,22 @@ func get_closest_point(p: Vector2)->Dictionary:
     'd': sqrt(best_dist)
   }
 
+func get_closest_curve_point(p: Vector2)->Vector2:
+  if interpolated_points.size() < 2:
+    return p;
+  var best
+  var best_dist:float = INF
+  var n:int = interpolated_points.size();
+  for i in (n - 1 if open else n):
+    var ct = Geometry2D.get_closest_point_to_segment(p, interpolated_points[i], interpolated_points[(i + 1) % interpolated_points.size()])
+    var d = p.distance_squared_to(ct)
+    if d < best_dist:
+      best_dist = d
+      best = ct
+  return best
+
 func update_shape():
+  if !is_node_ready(): return
   assert(degree < points.size(), 'degree must be less than or equal to point count - 1')
 
   var steps = detail * points.size()
